@@ -1,0 +1,40 @@
+name: Build Docker Image
+
+on:
+  push:
+    branches:
+    - main
+    tags:
+    - "v*"
+
+jobs:
+  build-images:
+    runs-on: ubuntu-latest
+    outputs:
+      author-name: ${{ steps.author-name.outputs.author-name }}
+      author-email: ${{ steps.author-email.outputs.author-email }}
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4.1.4
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5.5.1
+        with:
+          images: europe-west4-docker.pkg.dev/iaas-383414/iaas/grafana-datasource-oauth-proxy
+          tags: |
+            type=ref,event=tag
+            type=sha,event=branch,enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
+          flavor: |
+            latest=false
+      - name: Login to GAR
+        uses: docker/login-action@v3.1.0
+        with:
+          registry: europe-west4-docker.pkg.dev
+          username: _json_key
+          password: "${{ secrets.GOOGLE_ARTIFACTREGISTRY_CREDENTIALS }}"
+      - name: Build and push
+        uses: docker/build-push-action@v5.3.0
+        with:
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
