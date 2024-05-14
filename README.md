@@ -13,6 +13,7 @@ Requirements:
 - Grafana OSS server
 - Google OAuth2 Provider configured
 - Grafana Server Administrator credentials
+- "Forward OAuth Identity" enabled in datasource settings (.jsonData.oauthPassThru == true)
 
 Environment variables:
 - `GRAFANA_BASE_URL` - grafana oss server base url (like https://grafana.example.com or https://infra.example.com/grafana)
