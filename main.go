@@ -15,13 +15,12 @@ type ForbidViewerProxy struct {
 func (m ForbidViewerProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	token := r.Header.Get("X-ID-Token")
 	if token == "" {
-		log.Println("token not found")
-		m.proxy.ServeHTTP(w, r)
+		http.Error(w, "403 - JWT Token not found", http.StatusForbidden)
 	} else {
 		email, err := GetEmailFromGoogleJWT(token)
 		if err != nil {
 			log.Printf("Error getting email from Google JWT: %s\n", err)
-			http.Error(w, "500 - Error getting email from Google JWT!", http.StatusInternalServerError)
+			http.Error(w, "403 - Wrong JWT Token", http.StatusForbidden)
 		} else {
 			orgID := r.Header.Get("X-Grafana-Org-ID")
 			if isViewer(email, orgID) {
@@ -33,6 +32,7 @@ func (m ForbidViewerProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 }
+
 func NewForbidViewerProxy() ForbidViewerProxy {
 	target, err := url.Parse(os.Getenv("PROXY_ORIGIN_SERVER"))
 	if err != nil {
@@ -50,6 +50,7 @@ func NewForbidViewerProxy() ForbidViewerProxy {
 	}
 	return ForbidViewerProxy{*proxy}
 }
+
 func main() {
 	log.Fatal(http.ListenAndServe(":8989", NewForbidViewerProxy()))
 }
