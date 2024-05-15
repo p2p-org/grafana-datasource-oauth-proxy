@@ -15,7 +15,8 @@ type ForbidViewerProxy struct {
 func (m ForbidViewerProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	token := r.Header.Get("X-ID-Token")
 	if token == "" {
-		http.Error(w, "403 - JWT Token not found", http.StatusForbidden)
+		// grafana alerts goes to datasource without header
+		m.proxy.ServeHTTP(w, r)
 	} else {
 		email, err := GetEmailFromGoogleJWT(token)
 		if err != nil {
