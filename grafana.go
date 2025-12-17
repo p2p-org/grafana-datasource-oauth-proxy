@@ -2,11 +2,13 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
+	"time"
 )
 
 type GrafanaOrgUser struct {
@@ -14,33 +16,66 @@ type GrafanaOrgUser struct {
 	Role  string `json:"role"`
 }
 
-func isViewer(email string, orgID string) bool {
+type OrgUsers struct {
+	Users       []GrafanaOrgUser
+	OrgId       string
+	lastChecked time.Time
+}
+// todo: do not call grafana api on each incoming request
+type UsersCache struct {
+	users    map[string]OrgUsers
+	usersAPI string
+	auth     string
+	client   *http.Client
+}
+
+func NewUserCache() *UsersCache {
 	auth := os.Getenv("GRAFANA_AUTH")
-	client := &http.Client{}
+	if auth == ""  {
+		log.Fatalln("please provide GRAFANA_AUTH env")
+	}
+
 	grafanaURL, err := url.Parse(os.Getenv("GRAFANA_BASE_URL"))
 	if err != nil {
-		log.Printf("Error parsing GRAFANA_BASE_URL: %s\n", err)
-		return true
+		log.Fatalf("Error parsing GRAFANA_BASE_URL: %s", err)
 	}
 	grafanaURL.Path = path.Join(grafanaURL.Path, "/api/org/users")
-	req, err := http.NewRequest("GET", grafanaURL.String(), nil)
+
+	return &UsersCache{
+		users: make(map[string]OrgUsers),
+		usersAPI: grafanaURL.String(),
+		auth: auth,
+		client:  &http.Client{},
+	}
+}
+
+func (cache UsersCache) IsViewer(email string, orgID string) bool {
+	req, err := http.NewRequest("GET", cache.usersAPI, nil)
 	if err != nil {
-		log.Printf("Error creating request to Grafana API: %v\n", err)
-		return true
+		log.Fatalf("Error creating request to Grafana API: %v\n", err)
 	}
 	req.Header = http.Header{
-		"Authorization":    {auth},
+		"Authorization":    {cache.auth},
 		"X-Grafana-Org-Id": {orgID},
 	}
-	res, err := client.Do(req)
+	res, err := cache.client.Do(req)
 	if err != nil {
 		log.Printf("Error executing request to Grafana API: %v\n", err)
 		return true
 	}
-	var grafanaOrgUsers []GrafanaOrgUser
-	err = json.NewDecoder(res.Body).Decode(&grafanaOrgUsers)
+	bodyBytes, err := io.ReadAll(res.Body)
 	if err != nil {
-		log.Printf("Error decoding response from Grafana API: %v\n", err)
+		log.Fatal(err)
+	}
+	if res.StatusCode != http.StatusOK {
+		log.Fatalf("HTTP%d: %s", res.StatusCode, string(bodyBytes))
+	}
+
+	var grafanaOrgUsers []GrafanaOrgUser
+	err = json.Unmarshal(bodyBytes, &grafanaOrgUsers)
+	if err != nil {
+		log.Println(string(bodyBytes))
+		log.Fatalf("Error decoding response from Grafana API: %v\n", err)
 		return true
 	}
 	for _, grafanaOrgUser := range grafanaOrgUsers {

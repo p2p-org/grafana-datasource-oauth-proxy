@@ -9,7 +9,8 @@ import (
 )
 
 type ForbidViewerProxy struct {
-	proxy httputil.ReverseProxy
+	proxy *httputil.ReverseProxy
+	users *UsersCache
 }
 
 func (m ForbidViewerProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -24,7 +25,7 @@ func (m ForbidViewerProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "403 - Wrong JWT Token", http.StatusForbidden)
 		} else {
 			orgID := r.Header.Get("X-Grafana-Org-ID")
-			if isViewer(email, orgID) {
+			if m.users.IsViewer(email, orgID) {
 				log.Printf("Viewer %s in orgId %s not allowed to use datasource\n", email, orgID)
 				http.Error(w, "403 - Viewer not allowed to use datasource", http.StatusForbidden)
 			} else {
@@ -34,7 +35,7 @@ func (m ForbidViewerProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func NewForbidViewerProxy() ForbidViewerProxy {
+func NewForbidViewerProxy() *ForbidViewerProxy {
 	target, err := url.Parse(os.Getenv("PROXY_ORIGIN_SERVER"))
 	if err != nil {
 		log.Fatal(err)
@@ -49,7 +50,11 @@ func NewForbidViewerProxy() ForbidViewerProxy {
 
 		r.Host = target.Host // set Host header as expected by target
 	}
-	return ForbidViewerProxy{*proxy}
+
+	return &ForbidViewerProxy{
+		proxy: proxy,
+		users: NewUserCache(),
+	}
 }
 
 func main() {
