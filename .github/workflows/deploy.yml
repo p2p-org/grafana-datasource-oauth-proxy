@@ -27,7 +27,7 @@ jobs:
           flavor: |
             latest=false
       - name: Login to GAR
-        uses: docker/login-action@e92390c5fb421da1463c202d546fed0ec5c39f20 # v3.1.0
+        uses: docker/login-action@06fb636fac595d6fb4b28a5dfcb21a6f5091859c # v4.5.0
         with:
           registry: europe-west4-docker.pkg.dev
           username: _json_key
